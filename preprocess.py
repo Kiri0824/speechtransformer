@@ -2,6 +2,7 @@ import os
 import pickle
 from tqdm import tqdm
 from config import pickle_file,n_samples,trans_file,wav_folder
+# 获得pickle文件
 def ensure_folder(folder):
     import os
     if not os.path.isdir(folder):
