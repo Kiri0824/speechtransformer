@@ -1,7 +1,8 @@
 import os
-n_samples="train:-1,dev:-1,test:-1"
+import torch
 # -------------------------------------------------
 # 预处理添加噪声参数
+
 seed=111
 # 遮盖次数
 num_mask=2
@@ -11,17 +12,29 @@ freq_masking_max_percentage=0.15
 time_masking_max_percentage=0.3
 # -------------------------------------------------
 # 预处理添加跳帧和堆叠(体现在图中见jupyter)
+
 LFR_stack=4
 LFR_skip=3
 # 'Dim of encoder input (before LFR)'
 d_input=80
 # -------------------------------------------------
 # extract_feature
+
 # "sr"代表采样率（sample rate）
 # 采样率是指在一秒钟内对声音信号进行采样的次数。它表示每秒从连续模拟信号中获取的离散样本数
 sample_rate=16000
 # 填充的数值
 IGNORE_ID = -1
+# -------------------------------------------------
+# 训练参数
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+betch_size=32
+# 是否将加载的数据存储在固定内存中
+pin_memory=True
+shuffle=True
+num_workers=4
+
 # -------------------------------------------------
 # 文本位置参数
 DATA_DIR = '../dataset/'

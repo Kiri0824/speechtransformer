@@ -1,5 +1,6 @@
 import numpy as np
 from config import IGNORE_ID
+import torch
 from torch.utils.data.dataloader import default_collate
 # 填充,对patch排序
 def pad_collate(batch):
@@ -27,4 +28,5 @@ def pad_collate(batch):
     # 根据输入序列长度对批量进行排序（从长到短）
     batch.sort(key=lambda x: x[2], reverse=True)
 
-    return default_collate(batch)
+    # return default_collate(batch)
+    return default_collate([(torch.from_numpy(padded_input), torch.from_numpy(padded_target), input_length) for padded_input, padded_target, input_length in batch])

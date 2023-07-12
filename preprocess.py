@@ -1,7 +1,7 @@
 import os
 import pickle
 from tqdm import tqdm
-from config import pickle_file,n_samples,trans_file,wav_folder
+from config import pickle_file,trans_file,wav_folder
 # 获得pickle文件
 def ensure_folder(folder):
     import os
@@ -68,11 +68,8 @@ def build_vocab(token):
         VOCAB[token] = next_index
         IVOCAB[next_index] = token
 
-tmp = n_samples.split(",")
-tmp = [a.split(":") for a in tmp]
-tmp = {a[0]:int(a[1]) for a in tmp}
+
 n_samples = {"train":-1, "dev":-1,"test":-1}
-n_samples.update(tmp)
 
 VOCAB = {'<sos>': 0, '<eos>': 1}
 IVOCAB = {0: '<sos>', 1: '<eos>'}
