@@ -34,7 +34,8 @@ betch_size=32
 pin_memory=True
 shuffle=True
 num_workers=4
-
+# 输入到encoder的最大长度(传入一个音频max_len,d_model)
+max_len=5000
 # -------------------------------------------------
 # 文本位置参数
 DATA_DIR = '../dataset/'

@@ -38,7 +38,34 @@ noise_and_feature的extract_feature不懂,padding不懂
 
 填充整个数据集和填充每个批次区别?
 
+There are many choices of positional encodings, learned and fixed [9].位置编码原文说有好多种
 
 
 
 
+
+
+
+编码公式transformer原文:
+
+
+
+![image-20230712212238872](explain.assets/image-20230712212238872.png)
+
+
+
+另外两种写法
+
+![image-20230712212313450](explain.assets/image-20230712212313450.png)
+
+![image-20230712212319697](explain.assets/image-20230712212319697.png)
+
+无法与原文对应
+
+![image-20230712212333323](explain.assets/image-20230712212333323.png)
+
+
+
+positionalencoding问题:输出的形状
+
+encoder问题:原文得到编码后进入encoder先layer norm,transformer论文进去先多头
