@@ -48,8 +48,6 @@ There are many choices of positional encodings, learned and fixed [9].位置编�
 
 编码公式transformer原文:
 
-
-
 ![image-20230712212238872](explain.assets/image-20230712212238872.png)
 
 
@@ -66,6 +64,18 @@ There are many choices of positional encodings, learned and fixed [9].位置编�
 
 
 
-positionalencoding问题:输出的形状
+注意!
+
+![image-20230713222539808](explain.assets/image-20230713222539808.png)
 
 encoder问题:原文得到编码后进入encoder先layer norm,transformer论文进去先多头
+
+![image-20230713180029556](explain.assets/image-20230713180029556.png)
+
+未看清图导致残差错误
+
+pytorch在jupyter加载了数据之后函数加载一次修改无效,必须停止,比较麻烦
+
+
+
+单词编码:前一时刻与后一时刻的错位:前一时刻使用前导0补充,前一时刻所有之前补的-1都变成1

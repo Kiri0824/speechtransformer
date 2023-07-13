@@ -27,15 +27,17 @@ sample_rate=16000
 IGNORE_ID = -1
 # -------------------------------------------------
 # 训练参数
-
+VOCAB = {'<sos>': 0, '<eos>': 1}
+IVOCAB = {0: '<sos>', 1: '<eos>'}
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 betch_size=32
 # 是否将加载的数据存储在固定内存中
 pin_memory=True
 shuffle=True
-num_workers=4
+num_workers=0
 # 输入到encoder的最大长度(传入一个音频max_len,d_model)
 max_len=5000
+learning_rate=0.001
 # -------------------------------------------------
 # 文本位置参数
 DATA_DIR = '../dataset/'

@@ -7,19 +7,20 @@ class PositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len, device=device):
         super(PositionalEncoding, self).__init__()
         # max_len,d_model大小全0矩阵
-        self.encoding = torch.zeros(max_len, d_model, device=device)
-        self.encoding.requires_grad = False  
+        encoding = torch.zeros(max_len, d_model, device=device)
+        encoding.requires_grad = False  
         # 所有位置0~max_len
         pos = torch.arange(0, max_len, device=device)
         pos = pos.float().unsqueeze(dim=1)
         # 偶数索引
         _2i = torch.arange(0, d_model, step=2, device=device).float()
         # 偶数
-        self.encoding[:, 0::2] = torch.sin(pos / (10000 ** (_2i / d_model)))
+        encoding[:, 0::2] = torch.sin(pos / (10000 ** (_2i / d_model)))
         # 奇数
-        self.encoding[:, 1::2] = torch.cos(pos / (10000 ** (_2i / d_model)))
-
-    def forward(self, x):
+        encoding[:, 1::2] = torch.cos(pos / (10000 ** (_2i / d_model)))
+        encoding = encoding.unsqueeze(0)
+        self.register_buffer('encoding', encoding)
+    def forward(self,x):
         # x:torch.Size([32, 270, 320])
         seq_len= x.size(1)
-        return self.encoding[:seq_len, :]
+        return self.encoding[:, :seq_len,:]

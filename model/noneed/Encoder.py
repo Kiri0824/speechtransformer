@@ -8,9 +8,9 @@ class Encoder(nn.Module):
                  d_model=512, dim_feedforward=2048, dropout=0.1, max_len=5000):
         super(Encoder, self).__init__()
         self.encoderlayers=nn.ModuleList([nn.TransformerEncoderLayer
-                (d_model=d_model,nhead=n_head,dim_feedforward=dim_feedforward,dropout=dropout)
+                (d_model=d_model,nhead=n_head,dim_feedforward=dim_feedforward,dropout=dropout,norm_first=True)
                 for _ in range(n_layers)])
-        self.layernorm=nn.LayerNorm(d_model)
+        # self.layernorm=nn.LayerNorm(d_model)
         self.inputencoding=InputEncoding()
         self.positionalencoding = PositionalEncoding(d_model=d_model,max_len=max_len)
         self.linear=nn.Linear(d_input, d_model)
@@ -23,9 +23,9 @@ class Encoder(nn.Module):
         # 线性层到512
         LE=self.linear(x)
         # 相加
-        unlayernorm=PE+LE
-        # 进行第一次layernorm
-        inencoder=self.layernorm(unlayernorm)
+        inencoder=PE+LE
+        # # 进行第一次layernorm
+        # inencoder=self.layernorm(unlayernorm)
         output=inencoder
         # 使用torch的编码器层
         for en_layer in self.encoderlayers:

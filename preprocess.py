@@ -44,7 +44,7 @@ def get_data(split, n_samples):
 
             if key in tran_dict:
                 trn = tran_dict[key]
-                trn = list(trn.strip()) + ['<eos>']
+                trn = ['<sos>']+list(trn.strip()) + ['<eos>']
 
                 for token in trn:
                     build_vocab(token)

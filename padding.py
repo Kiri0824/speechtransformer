@@ -2,19 +2,12 @@ import numpy as np
 from config import IGNORE_ID
 import torch
 from torch.utils.data.dataloader import default_collate
-# 填充,对patch排序
+# 填充,对一个batch排序
 def pad_collate(batch):
-    max_input_len = float('-inf')  # 最长输入序列长度的初始值
-    max_target_len = float('-inf')  # 最长目标序列长度的初始值
-
-    # 遍历批量中的每个元素，获取最大的输入序列长度和目标序列长度
-    for elem in batch:
-        feature, trn = elem
-        # 更新最大输入序列长度
-        max_input_len = max(max_input_len, feature.shape[0])
-        # 更新最大目标序列长度
-        max_target_len = max(max_target_len, len(trn))
-
+    features, trn = zip(*batch)
+    # 找出最长的特征长度
+    max_input_len = max([len(feature) for feature in features])
+    max_target_len= max([len(trn) for trn in trn])
     # 对每个元素进行填充和处理
     for i, elem in enumerate(batch):
         feature, trn = elem
