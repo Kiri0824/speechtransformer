@@ -30,9 +30,9 @@ IGNORE_ID = -1
 VOCAB = {'<sos>': 0, '<eos>': 1}
 IVOCAB = {0: '<sos>', 1: '<eos>'}
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-betch_size=32
+betch_size=16
 # 是否将加载的数据存储在固定内存中
-pin_memory=True
+pin_memory=False
 shuffle=True
 num_workers=0
 # 输入到encoder的最大长度(传入一个音频max_len,d_model)
