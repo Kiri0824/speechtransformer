@@ -71,8 +71,8 @@ def build_vocab(token):
 
 n_samples = {"train":-1, "dev":-1,"test":-1}
 
-VOCAB = {'<sos>': 0, '<eos>': 1}
-IVOCAB = {0: '<sos>', 1: '<eos>'}
+VOCAB = {'<PAD>':0,'<sos>': 1, '<eos>': 2}
+IVOCAB = {0:'<PAD>',1: '<sos>', 2: '<eos>'}
 
 data = dict()
 data['VOCAB'] = VOCAB
