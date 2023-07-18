@@ -122,18 +122,15 @@ class SpeechDataset(Dataset):
         # 标准化
         feature = (feature - feature.mean()) / feature.std()
         # 添加噪声
-        feature=spec_augment(feature)
+        # feature=spec_augment(feature)
         feature=build_LFR_features(feature)
         feature = torch.from_numpy(feature)
         feature = torch.unsqueeze(feature, 0)
         feature = torch.reshape(feature, (1, feature.shape[1], feature.shape[2]))
         feature = self.transform(feature)
         feature = torch.reshape(feature, (feature.shape[1], feature.shape[2]))
-
-        padded_input = np.zeros(max_sequence_length, dtype=np.int32)
-        padded_input[:len(trn)] = trn
-        trn = torch.from_numpy(padded_input)
-        return feature,trn
+        merged_sentence = ''.join(trn)
+        return feature,merged_sentence
     def __len__(self):
         # len(dataset)
         return self.n_samples

@@ -35,10 +35,9 @@ class MultiHeadAttention(nn.Module):
         qkv = qkv.permute(0, 2, 1, 3)
         q, k, v = qkv.chunk(3, dim=-1)
         values, attention = scaled_dot_product_attention(q, k, v, mask)
-        values = values.reshape(batch_size, max_sequence_length, self.num_heads * self.head_dim)#32,300,512
+        values = values.permute(0, 2, 1, 3).reshape(batch_size, max_sequence_length, self.num_heads * self.head_dim)#32,300,512
         # 上图中linear
         out = self.linear_layer(values)
-
         return out
 # 返回位置编码
 class PositionalEncoding(nn.Module):
@@ -94,6 +93,7 @@ class EncoderLayer(nn.Module):
         x=self.droupout2(x)
         x=self.norm2(x+residual_x)
         return x
+
 # 编码器包括了输入线性变换到d_model维度
 # 编码器是先多头再归一化
 class Encoder(nn.Module):
@@ -110,7 +110,7 @@ class Encoder(nn.Module):
 # 返回的是加上位置编码的输入
 class EmbeddingPosition(nn.Module):
     # language_to_index是一个字典,包含所有字的索引,传入char_list
-    def __init__(self, max_sequence_length, d_model, language_to_index ):
+    def __init__(self, max_sequence_length, d_model, language_to_index,START_TOKEN, END_TOKEN, PADDING_TOKEN):
         super().__init__()
         self.vocab_size = len(language_to_index)
         self.max_sequence_length = max_sequence_length
@@ -118,8 +118,26 @@ class EmbeddingPosition(nn.Module):
         self.language_to_index = language_to_index
         self.position_encoder = PositionalEncoding(d_model, max_sequence_length)
         self.dropout = nn.Dropout(p=0.1)
-
-    def forward(self, x): 
+        self.START_TOKEN = START_TOKEN
+        self.END_TOKEN = END_TOKEN
+        self.PADDING_TOKEN = PADDING_TOKEN
+    def batch_tokenize(self, batch, start_token, end_token):
+        def tokenize(sentence, start_token, end_token):
+            sentence_word_indicies = [self.language_to_index[token] for token in list(sentence)]
+            if start_token:
+                sentence_word_indicies.insert(0, self.language_to_index[self.START_TOKEN])
+            if end_token:
+                sentence_word_indicies.append(self.language_to_index[self.END_TOKEN])
+            for _ in range(len(sentence_word_indicies), self.max_sequence_length):
+                sentence_word_indicies.append(self.language_to_index[self.PADDING_TOKEN])
+            return torch.tensor(sentence_word_indicies)
+        tokenized = []
+        for sentence_num in range(len(batch)):
+           tokenized.append( tokenize(batch[sentence_num], start_token, end_token) )
+        tokenized = torch.stack(tokenized)
+        return tokenized.to(device)
+    def forward(self, x,start_token, end_token): 
+        x = self.batch_tokenize(x, start_token, end_token)
         x = self.embedding(x)
         pos = self.position_encoder().to(device)
         x = self.dropout(x + pos)
@@ -134,7 +152,7 @@ class MultiHeadCrossAttention(nn.Module):
         self.q_layer = nn.Linear(d_model , d_model)
         self.linear_layer = nn.Linear(d_model, d_model)
     
-    def forward(self, x, y, mask=None):
+    def forward(self, x, y, mask):
         batch_size, sequence_length, d_model = x.size() #30*300*512
         kv = self.kv_layer(x)#30*300*1024
         q = self.q_layer(y)#30*300*512
@@ -143,7 +161,6 @@ class MultiHeadCrossAttention(nn.Module):
         kv = kv.permute(0, 2, 1, 3)#30*8*300*128
         q = q.permute(0, 2, 1, 3)#30*8*300*64
         k, v = kv.chunk(2, dim=-1)#K:30*8*300*64 V:30*8*300*64
-        # 加入编码器时无需mask
         values, attention = scaled_dot_product_attention(q, k, v, mask) 
         values = values.permute(0, 2, 1, 3).reshape(batch_size, sequence_length, d_model)
         out = self.linear_layer(values)
@@ -184,31 +201,31 @@ class DecoderLayer(nn.Module):
 class SequentialDecoder(nn.Sequential):
     def forward(self,*inputs):
         x,y,self_attention_mask,cross_attention_mask =inputs
-        for module in self:
+        for module in self._modules.values():
             y=module(x,y,self_attention_mask,cross_attention_mask)
         return y
 class Decoder(nn.Module):
-    def __init__(self,d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index):
+    def __init__(self,d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN):
         super(Decoder,self).__init__()
         # 词语嵌入
-        self.embedding = EmbeddingPosition(max_sequence_length, d_model, language_to_index)
+        self.embedding = EmbeddingPosition(max_sequence_length, d_model, language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN)
         self.layers=SequentialDecoder(*[DecoderLayer(d_model,ffn_hidden,num_heads,drop_prob) for _ in range(num_layers)])
-    def forward(self,x,y,self_attention_mask,cross_attention_mask=None):
+    def forward(self,x,y,self_attention_mask,cross_attention_mask,start_token,end_token):
         # x:32*300*512
         # y:32*300*512
         # mask:300*300
-        y = self.embedding(y)
+        y = self.embedding(y, start_token, end_token)
         y=self.layers(x,y,self_attention_mask,cross_attention_mask)
         return y 
 class Transformer(nn.Module):
-    def __init__(self,d_model,d_input,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index):
+    def __init__(self,d_model,d_input,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN):
         super(Transformer,self).__init__()
         self.encoder=Encoder(d_input,d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length)
-        self.decoder=Decoder(d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index)
+        self.decoder=Decoder(d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN)
         self.linear=nn.Linear(d_model,len(language_to_index))
-    def forward(self,x,y,de_mask,de_cross_mask=None):
+    def forward(self,x,y,de_mask,de_cross_mask,start_token,end_token):
         # 只有解码器注意力需要mask,de_cross_mask也是不需要传入
         x=self.encoder(x)
-        y=self.decoder(x,y,de_mask,de_cross_mask)
+        y=self.decoder(x,y,de_mask,de_cross_mask,start_token,end_token)
         y=self.linear(y)
         return y

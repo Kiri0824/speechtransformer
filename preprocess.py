@@ -44,12 +44,12 @@ def get_data(split, n_samples):
 
             if key in tran_dict:
                 trn = tran_dict[key]
-                trn = ['<sos>']+list(trn.strip()) + ['<eos>']
+                trn = list(trn.strip())
 
                 for token in trn:
                     build_vocab(token)
 
-                trn = [VOCAB[token] for token in trn]
+                # trn = [VOCAB[token] for token in trn]
 
                 samples.append({'trn': trn, 'wave': wave})
         

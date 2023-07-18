@@ -28,24 +28,26 @@ NEG_INF = -1e9
 
 # 训练参数
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-PADDING=0
-batch_size=64
+batch_size=32
 d_model=512
 d_input=320
 num_heads=8
 drop_prob=0.1
-# 语音是时间序列,最长50
+# 语音是时间序列,最长300
 max_sequence_length=50
 # feedforward神经网络的隐藏层维度
-ffn_hidden=1024
-num_layers=3
+ffn_hidden=2048
+num_layers=5
 shuffle=True
 num_workers=0
 learning_rate=1e-4
-epochs=10
+epochs=20
 pin_memory=True
 shuffle=True
 num_workers=0
+START_TOKEN='<sos>'
+END_TOKEN='<eos>'
+PADDING_TOKEN='<PAD>'
 # -------------------------------------------------
 
 # 文本位置参数

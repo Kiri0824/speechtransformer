@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch
 import pickle
 from data_load import SpeechDataset
-from config import batch_size,pickle_file,PADDING
+from config import batch_size,pickle_file,START_TOKEN,END_TOKEN,PADDING_TOKEN
 from config import device,learning_rate,d_model,d_input,ffn_hidden
 from config import num_heads,drop_prob,num_layers,max_sequence_length
 from config import epochs,shuffle,num_workers,pin_memory
@@ -19,16 +19,14 @@ def train_loop(model, opt, loss_fn, dataloader,epoch):
     total_loss = 0
     progress_bar = tqdm(dataloader, desc='Training')
     for batch in progress_bar:
-        input_batch, target_batch = batch[0].to(device), batch[1].to(device)
-        labels=target_batch[:,1:]
-        decoder_self_attention_mask = create_masks(target_batch)
-        decoder_self_attention_mask=decoder_self_attention_mask.to(device)
+        input_batch, target_batch = batch[0].to(device), batch[1]
+        decoder_self_attention_mask,decoder_cross_attention_mask=create_masks(batch[1])
         opt.zero_grad()
-        predicted_batch = model(input_batch, target_batch,decoder_self_attention_mask).to(device)
-        predicted_batch=predicted_batch[:,:-1,:]
-        loss=loss_fn(predicted_batch.reshape(-1,len(char_list)).to(device),labels.reshape(-1).to(device).long()).to(device)
-        valid_position = torch.where(labels.reshape(-1)== PADDING, False, True)
-        loss=loss.sum()/valid_position.sum()
+        predicted_batch = model(input_batch, target_batch,decoder_self_attention_mask.to(device),decoder_cross_attention_mask.to(device),START_TOKEN,END_TOKEN).to(device)
+        labels = transformer.decoder.embedding.batch_tokenize(target_batch, start_token=False, end_token=True)
+        loss=loss_fn(predicted_batch.view(-1,len(number_list)).to(device),labels.view(-1)).to(device)
+        valid_position = torch.where(labels.view(-1)== number_list[PADDING_TOKEN], False, True)
+        loss = loss.sum() / valid_position.sum()
         loss.backward()
         opt.step()
         
@@ -40,35 +38,31 @@ def train_loop(model, opt, loss_fn, dataloader,epoch):
             label = labels[0]
             predicted_sentence = ""
             for idx in predicted:
-              if idx == PADDING:
+              if idx == number_list[PADDING_TOKEN]:
                 break
               predicted_sentence += char_list[idx.item()]
-            print(f"pred_en: {predicted}")
             print(f"pred: {predicted_sentence}")
             label_sentence = ""
             for idx in label:
-              if idx == PADDING:
+              if idx == number_list[PADDING_TOKEN]:
                 break
               label_sentence += char_list[idx.item()]
-            print(f"real_en: {label}")
             print(f"real: {label_sentence}")
         writer.add_scalar('Train batch Loss (Epoch {})'.format(epoch),total_loss / (progress_bar.n + 1), progress_bar.n + 1)
     return total_loss / len(dataloader)
-def val_loop(model, opt, loss_fn, dataloader,epoch):
+def val_loop(model, dataloader,epoch):
     model.eval()
     total_loss = 0
     progress_bar = tqdm(dataloader, desc='Validation')
     with torch.no_grad():
         for batch in progress_bar:
-            input_batch, target_batch = batch[0].to(device), batch[1].to(device)
-            labels=target_batch[:,1:]
-            decoder_self_attention_mask = create_masks(target_batch)
-            decoder_self_attention_mask=decoder_self_attention_mask.to(device)
-            opt.zero_grad()
-            predicted_batch = model(input_batch, target_batch,decoder_self_attention_mask)
-            predicted_batch=predicted_batch[:,:-1,:]
-            loss=loss_fn(predicted_batch.reshape(-1,len(char_list)).to(device),labels.reshape(-1).to(device).long()).to(device)
-            loss=loss.sum()/valid_position.sum()
+            input_batch, target_batch = batch[0].to(device), batch[1]
+            decoder_self_attention_mask,decoder_cross_attention_mask=create_masks(batch[1])
+            predicted_batch = model(input_batch, target_batch,decoder_self_attention_mask.to(device),decoder_cross_attention_mask.to(device),START_TOKEN,END_TOKEN).to(device)
+            labels = transformer.decoder.embedding.batch_tokenize(target_batch, start_token=False, end_token=True)
+            loss=loss_fn(predicted_batch.view(-1,len(number_list)).to(device),labels.view(-1)).to(device)
+            valid_position = torch.where(labels.view(-1)== number_list[PADDING_TOKEN], False, True)
+            loss = loss.sum() / valid_position.sum()
             total_loss+=loss.item()
             progress_bar.set_postfix({'loss': loss.item()})
             writer.add_scalar('Validation batch Loss (Epoch {})'.format(epoch), total_loss / (progress_bar.n + 1), progress_bar.n + 1)
@@ -79,14 +73,14 @@ def fit(model, opt, loss_fn, train_dataloader, val_dataloader, epochs):
     best_loss = float('inf')
     epochs_since_improvement = 0
     print("Training and validating model")
-    for epoch in range(epochs):
+    for epoch in range(15,epochs):
         print("-"*25, f"Epoch {epoch + 1}","-"*25)
         
         train_loss = train_loop(model, opt, loss_fn, train_dataloader,epoch)
         writer.add_scalar('Loss/train', train_loss, epoch) 
         train_loss_list += [train_loss]
         
-        validation_loss = val_loop(model, loss_fn, val_dataloader,epoch)
+        validation_loss = val_loop(model,val_dataloader,epoch)
         writer.add_scalar('Loss/validation', validation_loss, epoch)
         validation_loss_list += [validation_loss]
         
@@ -98,10 +92,10 @@ def fit(model, opt, loss_fn, train_dataloader, val_dataloader, epochs):
         
         if not is_best:
             epochs_since_improvement += 1
-            print("\nEpochs since last improvement: %d\n" % (epochs_since_improvement,))
+            print("\nEpochs since last improvement: %d\n" % (epochs_since_improvement))
         else:
             epochs_since_improvement = 0
-            save_checkpoint(epoch, epochs_since_improvement, model, optimizer, best_loss, is_best)
+            torch.save(model.state_dict(), 'results/transformer.pth')
     writer.close()  
     return train_loss_list, validation_loss_list
 
@@ -115,12 +109,15 @@ val_dataset=SpeechDataset('dev')
 val_dataloader=DataLoader(val_dataset, batch_size=batch_size,pin_memory=pin_memory, shuffle=shuffle, num_workers=num_workers)
 
 char_list=data['IVOCAB']
-transformer=Transformer(d_model,d_input,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,char_list).to(device)
-loss_fn = nn.CrossEntropyLoss()
+number_list=data['VOCAB']
+transformer=Transformer(d_model,d_input,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,number_list,START_TOKEN=START_TOKEN,END_TOKEN=END_TOKEN,PADDING_TOKEN=PADDING_TOKEN).to(device)
+loss_fn = nn.CrossEntropyLoss(ignore_index=number_list[PADDING_TOKEN],reduction='none')
 for params in transformer.parameters():
     if params.dim() > 1:
         nn.init.xavier_uniform_(params)
 optimizer = torch.optim.Adam(transformer.parameters(), lr=learning_rate)
 
+state_dict = torch.load('results/transformer.pth')
+transformer.load_state_dict(state_dict)
 train_loss_list, validation_loss_list = fit(model=transformer, opt=optimizer, loss_fn=loss_fn, 
                         train_dataloader=train_dataloader, val_dataloader=val_dataloader, epochs=epochs)
