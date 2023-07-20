@@ -9,6 +9,28 @@ import pickle
 from config import pickle_file
 from config import num_mask,freq_masking_max_percentage,time_masking_max_percentage,sample_rate,LFR_stack,LFR_skip,d_input
 from config import max_sequence_length,d_feature
+from torch.utils.data.dataloader import default_collate
+def pad_collate(batch):
+    max_input_len = float('-inf')
+    max_target_len = float('-inf')
+
+    for elem in batch:
+        feature, trn = elem
+        max_input_len = max_input_len if max_input_len > feature.shape[0] else feature.shape[0]
+        max_target_len = max_target_len if max_target_len > len(trn) else len(trn)
+
+    for i, elem in enumerate(batch):
+        feature, trn = elem
+        input_length = feature.shape[0]
+        input_dim = feature.shape[1]
+        padded_input = np.zeros((max_input_len, input_dim), dtype=np.float32)
+        padded_input[:input_length, :] = feature
+        batch[i] = (padded_input, trn, input_length)
+
+    # sort it by input lengths (long to short)
+    batch.sort(key=lambda x: x[2], reverse=True)
+
+    return default_collate(batch)
 def normalize(yt):
     yt_max = np.max(yt)
     yt_min = np.min(yt)
@@ -122,13 +144,13 @@ class SpeechDataset(Dataset):
         # 标准化
         feature = (feature - feature.mean()) / feature.std()
         # 添加噪声
-        # feature=spec_augment(feature)
+        feature=spec_augment(feature)
         feature=build_LFR_features(feature)
-        feature = torch.from_numpy(feature)
-        feature = torch.unsqueeze(feature, 0)
-        feature = torch.reshape(feature, (1, feature.shape[1], feature.shape[2]))
-        feature = self.transform(feature)
-        feature = torch.reshape(feature, (feature.shape[1], feature.shape[2]))
+        # feature = torch.from_numpy(feature)
+        # feature = torch.unsqueeze(feature, 0)
+        # feature = torch.reshape(feature, (1, feature.shape[1], feature.shape[2]))
+        # feature = self.transform(feature)
+        # feature = torch.reshape(feature, (feature.shape[1], feature.shape[2]))
         merged_sentence = ''.join(trn)
         return feature,merged_sentence
     def __len__(self):

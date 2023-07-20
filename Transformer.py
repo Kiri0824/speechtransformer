@@ -34,6 +34,10 @@ class MultiHeadAttention(nn.Module):
         qkv = qkv.reshape(batch_size, max_sequence_length, self.num_heads, 3 * self.head_dim)
         qkv = qkv.permute(0, 2, 1, 3)
         q, k, v = qkv.chunk(3, dim=-1)
+        if mask is not None:
+            values, attention = scaled_dot_product_attention(q, k, v, mask[:,:x.size(1), :])
+        else:
+            values, attention = scaled_dot_product_attention(q, k, v, None)
         values, attention = scaled_dot_product_attention(q, k, v, mask)
         values = values.permute(0, 2, 1, 3).reshape(batch_size, max_sequence_length, self.num_heads * self.head_dim)#32,300,512
         # 上图中linear
@@ -42,23 +46,23 @@ class MultiHeadAttention(nn.Module):
 # 返回位置编码
 class PositionalEncoding(nn.Module):
 
-    def __init__(self, d_model, max_sequence_length):
+    def __init__(self, d_model):
         super(PositionalEncoding,self).__init__()
-        self.max_sequence_length = max_sequence_length
         self.d_model = d_model
-    def forward(self):
+    def forward(self,x):
         # even_i是偶数的位置
         even_i = torch.arange(0, self.d_model, 2).float()
         # denominator是分母
         denominator = torch.pow(10000, even_i/self.d_model)
-        position = torch.arange(self.max_sequence_length).reshape(self.max_sequence_length, 1)
+        position = torch.arange(x.size(1)).reshape(x.size(1), 1)
         even_PE = torch.sin(position / denominator)
         odd_PE = torch.cos(position / denominator)
         # stacked是将两个矩阵按照第三个维度拼接
         stacked = torch.stack([even_PE, odd_PE], dim=2)
         # PE的维度是max_sequence_length*d_model
-        PE = torch.flatten(stacked, start_dim=1, end_dim=2)
-        return PE
+        PE = torch.flatten(stacked, start_dim=1, end_dim=2).to(device)
+        x = x + PE[:x.size(1), :]
+        return x
 class PositionwiseFeedForward(nn.Module):
 
     def __init__(self, d_model, hidden, drop_prob=0.1):
@@ -97,15 +101,14 @@ class EncoderLayer(nn.Module):
 # 编码器包括了输入线性变换到d_model维度
 # 编码器是先多头再归一化
 class Encoder(nn.Module):
-    def __init__(self,d_input,d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length):
+    def __init__(self,d_input,d_model,ffn_hidden,num_heads,drop_prob,num_layers):
         super(Encoder,self).__init__()
         self.linear_in = nn.Linear(d_input, d_model)
-        self.position_encoder = PositionalEncoding(d_model, max_sequence_length)
+        self.position_encoder = PositionalEncoding(d_model)
         self.layers=nn.Sequential(*[EncoderLayer(d_model,ffn_hidden,num_heads,drop_prob) for _ in range(num_layers)])
     def forward(self,x):
-        PE=self.position_encoder().to(device)
         x=self.linear_in(x)
-        x=x+PE
+        x=self.position_encoder(x).to(device)
         return self.layers(x)
 # 返回的是加上位置编码的输入
 class EmbeddingPosition(nn.Module):
@@ -116,7 +119,7 @@ class EmbeddingPosition(nn.Module):
         self.max_sequence_length = max_sequence_length
         self.embedding = nn.Embedding(self.vocab_size, d_model)
         self.language_to_index = language_to_index
-        self.position_encoder = PositionalEncoding(d_model, max_sequence_length)
+        self.position_encoder = PositionalEncoding(d_model)
         self.dropout = nn.Dropout(p=0.1)
         self.START_TOKEN = START_TOKEN
         self.END_TOKEN = END_TOKEN
@@ -139,8 +142,8 @@ class EmbeddingPosition(nn.Module):
     def forward(self, x,start_token, end_token): 
         x = self.batch_tokenize(x, start_token, end_token)
         x = self.embedding(x)
-        pos = self.position_encoder().to(device)
-        x = self.dropout(x + pos)
+        x = self.position_encoder(x).to(device)
+        x = self.dropout(x)
         return x
 class MultiHeadCrossAttention(nn.Module):
     def __init__(self, d_model, num_heads):
@@ -157,12 +160,12 @@ class MultiHeadCrossAttention(nn.Module):
         kv = self.kv_layer(x)#30*300*1024
         q = self.q_layer(y)#30*300*512
         kv = kv.reshape(batch_size, sequence_length, self.num_heads, 2 * self.head_dim)#30*500*8*128
-        q = q.reshape(batch_size, sequence_length, self.num_heads, self.head_dim)#30*500*8*64
+        q = q.reshape(batch_size, y.size(1), self.num_heads, self.head_dim)#30*500*8*64
         kv = kv.permute(0, 2, 1, 3)#30*8*300*128
         q = q.permute(0, 2, 1, 3)#30*8*300*64
         k, v = kv.chunk(2, dim=-1)#K:30*8*300*64 V:30*8*300*64
         values, attention = scaled_dot_product_attention(q, k, v, mask) 
-        values = values.permute(0, 2, 1, 3).reshape(batch_size, sequence_length, d_model)
+        values = values.permute(0, 2, 1, 3).reshape(batch_size, y.size(1), d_model)
         out = self.linear_layer(values)
         return out
 class DecoderLayer(nn.Module):
@@ -180,7 +183,7 @@ class DecoderLayer(nn.Module):
         self.layer_norm3 = nn.LayerNorm(d_model)
         self.dropout3 = nn.Dropout(p=drop_prob)
 
-    def forward(self, x, y, self_attention_mask, cross_attention_mask):
+    def forward(self, x, y, self_attention_mask):
         _y = y.clone()  #只是为了加法
         # 解码器需要mask
         y = self.mask_attention(y, mask=self_attention_mask)
@@ -188,7 +191,7 @@ class DecoderLayer(nn.Module):
         y = self.layer_norm1(y + _y)
 
         _y = y.clone()
-        y = self.encoder_decoder_attention(x, y, mask=cross_attention_mask)
+        y = self.encoder_decoder_attention(x, y, mask=None)
         y = self.dropout2(y)
         y = self.layer_norm2(y + _y)
 
@@ -200,9 +203,9 @@ class DecoderLayer(nn.Module):
 # 解码器的正向传播输入参数是多个,需要重写
 class SequentialDecoder(nn.Sequential):
     def forward(self,*inputs):
-        x,y,self_attention_mask,cross_attention_mask =inputs
+        x,y,self_attention_mask =inputs
         for module in self._modules.values():
-            y=module(x,y,self_attention_mask,cross_attention_mask)
+            y=module(x,y,self_attention_mask)
         return y
 class Decoder(nn.Module):
     def __init__(self,d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN):
@@ -210,22 +213,22 @@ class Decoder(nn.Module):
         # 词语嵌入
         self.embedding = EmbeddingPosition(max_sequence_length, d_model, language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN)
         self.layers=SequentialDecoder(*[DecoderLayer(d_model,ffn_hidden,num_heads,drop_prob) for _ in range(num_layers)])
-    def forward(self,x,y,self_attention_mask,cross_attention_mask,start_token,end_token):
+    def forward(self,x,y,self_attention_mask,start_token,end_token):
         # x:32*300*512
         # y:32*300*512
         # mask:300*300
         y = self.embedding(y, start_token, end_token)
-        y=self.layers(x,y,self_attention_mask,cross_attention_mask)
+        y=self.layers(x,y,self_attention_mask)
         return y 
 class Transformer(nn.Module):
     def __init__(self,d_model,d_input,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN):
         super(Transformer,self).__init__()
-        self.encoder=Encoder(d_input,d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length)
+        self.encoder=Encoder(d_input,d_model,ffn_hidden,num_heads,drop_prob,num_layers)
         self.decoder=Decoder(d_model,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,language_to_index,START_TOKEN,END_TOKEN,PADDING_TOKEN)
         self.linear=nn.Linear(d_model,len(language_to_index))
-    def forward(self,x,y,de_mask,de_cross_mask,start_token,end_token):
+    def forward(self,x,y,de_mask,start_token,end_token):
         # 只有解码器注意力需要mask,de_cross_mask也是不需要传入
         x=self.encoder(x)
-        y=self.decoder(x,y,de_mask,de_cross_mask,start_token,end_token)
+        y=self.decoder(x,y,de_mask,start_token,end_token)
         y=self.linear(y)
         return y

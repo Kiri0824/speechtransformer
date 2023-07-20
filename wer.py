@@ -22,6 +22,10 @@ def chinese_word_error_rate(reference, hypothesis):
 
     # 计算词错误率
     errors = dp[len(reference_words)][len(hypothesis_words)]
-    wer = errors / len(reference_words)
-
+    if len(reference_words) == 0:
+        wer = 1
+    else:
+        wer = errors / len(reference_words)
+    if wer>1:
+        wer=1
     return wer

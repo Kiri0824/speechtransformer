@@ -1,3 +1,8 @@
 
 transformer10貌似错误.pth
 results/transformer.pth
+trainfalse/logs/events.out.tfevents.1689613434.JinghuaZhao.14960.0
+*.pth
+*.0
+*.0
+results/logs/events.out.tfevents.1689613434.JinghuaZhao.14960.0
