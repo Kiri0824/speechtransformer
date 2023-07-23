@@ -1,31 +1,24 @@
-import jieba
-
-def chinese_word_error_rate(reference, hypothesis):
-    reference_words = list(jieba.cut(reference))
-    hypothesis_words = list(jieba.cut(hypothesis))
-
-    # 动态规划计算编辑距离
-    dp = [[0] * (len(hypothesis_words) + 1) for _ in range(len(reference_words) + 1)]
-
-    for i in range(len(reference_words) + 1):
-        dp[i][0] = i
-
-    for j in range(len(hypothesis_words) + 1):
-        dp[0][j] = j
-
-    for i in range(1, len(reference_words) + 1):
-        for j in range(1, len(hypothesis_words) + 1):
-            if reference_words[i - 1] == hypothesis_words[j - 1]:
-                dp[i][j] = dp[i - 1][j - 1]
+import numpy
+# 词错误率也叫字错误率
+def wer(r: list, h: list):
+    r = [x for x in r]
+    h = [x for x in h]
+    d = numpy.zeros((len(r) + 1) * (len(h) + 1), dtype=numpy.uint16)
+    d = d.reshape((len(r) + 1, len(h) + 1))
+    for i in range(len(r) + 1):
+        for j in range(len(h) + 1):
+            if i == 0:
+                d[0][j] = j
+            elif j == 0:
+                d[i][0] = i
+    # computation
+    for i in range(1, len(r) + 1):
+        for j in range(1, len(h) + 1):
+            if r[i - 1] == h[j - 1]:
+                d[i][j] = d[i - 1][j - 1]
             else:
-                dp[i][j] = min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]) + 1
-
-    # 计算词错误率
-    errors = dp[len(reference_words)][len(hypothesis_words)]
-    if len(reference_words) == 0:
-        wer = 1
-    else:
-        wer = errors / len(reference_words)
-    if wer>1:
-        wer=1
-    return wer
+                substitution = d[i - 1][j - 1] + 1
+                insertion = d[i][j - 1] + 1
+                deletion = d[i - 1][j] + 1
+                d[i][j] = min(substitution, insertion, deletion)
+    return d[len(r)][len(h)] / float(len(r))

@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch
 import pickle
 from data_load import SpeechDataset,pad_collate
-from config import batch_size,pickle_file,START_TOKEN,END_TOKEN,PADDING_TOKEN,LFR_skip,LFR_stack
+from config import batch_size,pickle_file,START_TOKEN,END_TOKEN,PADDING_TOKEN,LFR_skip,LFR_stack,num_layers
 from config import device,learning_rate,d_model,d_input,ffn_hidden
-from config import num_heads,drop_prob,num_layers,max_sequence_length
-from config import epochs,shuffle,num_workers,pin_memory,d_feature
+from config import num_heads,drop_prob,max_sequence_length
+from config import epochs,shuffle,num_workers,pin_memory,d_feature,en_num_layers,ou_num_layers
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 from mask import create_masks
@@ -15,8 +15,10 @@ import torch
 from torch.utils.tensorboard import SummaryWriter
 
 
+
 def train_loop(model, opt, loss_fn, dataloader,epoch):
     model.train()
+    # losses = AverageMeter()
     total_loss = 0
     progress_bar = tqdm(dataloader, desc='Training')
     for batch in progress_bar:
@@ -25,15 +27,21 @@ def train_loop(model, opt, loss_fn, dataloader,epoch):
         opt.zero_grad()
         predicted_batch = model(input_batch, target_batch,decoder_self_attention_mask.to(device),START_TOKEN,END_TOKEN).to(device)
         labels = transformer.decoder.embedding.batch_tokenize(target_batch, start_token=False, end_token=True)
+        
+        
         loss=loss_fn(predicted_batch.view(-1,len(number_list)).to(device),labels.view(-1)).to(device)
         valid_position = torch.where(labels.view(-1)== number_list[PADDING_TOKEN], False, True)
         loss = loss.sum() / valid_position.sum()
         loss.backward()
         opt.step()
         
+
         total_loss+=loss.item()
         progress_bar.set_postfix({'loss': loss.item()})
         if progress_bar.n % 100 == 0:
+            
+            print(f"Iteration {progress_bar.n} : {loss.item()}")
+            
             print(f"Iteration {progress_bar.n} : {loss.item()}")
             predicted = torch.argmax(predicted_batch[0], axis=1)
             label = labels[0]
@@ -51,8 +59,10 @@ def train_loop(model, opt, loss_fn, dataloader,epoch):
             print(f"real: {label_sentence}")
         writer.add_scalar('Train batch Loss (Epoch {})'.format(epoch),total_loss / (progress_bar.n + 1), progress_bar.n + 1)
     return total_loss / len(dataloader)
+    # return losses.avg
 def val_loop(model, dataloader,epoch):
     model.eval()
+    # losses = AverageMeter()
     total_loss = 0
     progress_bar = tqdm(dataloader, desc='Validation')
     with torch.no_grad():
@@ -61,6 +71,7 @@ def val_loop(model, dataloader,epoch):
             decoder_self_attention_mask,decoder_cross_attention_mask=create_masks(batch[1])
             predicted_batch = model(input_batch, target_batch,decoder_self_attention_mask.to(device),START_TOKEN,END_TOKEN).to(device)
             labels = transformer.decoder.embedding.batch_tokenize(target_batch, start_token=False, end_token=True)
+ 
             loss=loss_fn(predicted_batch.view(-1,len(number_list)).to(device),labels.view(-1)).to(device)
             valid_position = torch.where(labels.view(-1)== number_list[PADDING_TOKEN], False, True)
             loss = loss.sum() / valid_position.sum()
@@ -88,6 +99,7 @@ def val_loop(model, dataloader,epoch):
                 
                 print(predicted_sentence[0])
                 print(trn)
+    # return losses.avg
     return total_loss / len(dataloader)
 
 def fit(model, opt, loss_fn, train_dataloader, val_dataloader, epochs):
@@ -96,7 +108,7 @@ def fit(model, opt, loss_fn, train_dataloader, val_dataloader, epochs):
     epochs_since_improvement = 0
     print("Training and validating model")
     for epoch in range(epochs):
-        print("-"*25, f"Epoch {epoch + 1}","-"*25)
+        print("-"*25, f"Epoch {epoch + 1}","-"*25)    
         train_loss = train_loop(model, opt, loss_fn, train_dataloader,epoch)
         writer.add_scalar('Loss/train', train_loss, epoch) 
         train_loss_list += [train_loss]
@@ -136,9 +148,10 @@ loss_fn = nn.CrossEntropyLoss(ignore_index=number_list[PADDING_TOKEN],reduction=
 for params in transformer.parameters():
     if params.dim() > 1:
         nn.init.xavier_uniform_(params)
-optimizer = torch.optim.Adam(transformer.parameters(), lr=learning_rate)
+
 
 # state_dict = torch.load('results/transformer.pth')
 # transformer.load_state_dict(state_dict)
+optimizer = torch.optim.Adam(transformer.parameters(), lr=learning_rate)
 train_loss_list, validation_loss_list = fit(model=transformer, opt=optimizer, loss_fn=loss_fn, 
                         train_dataloader=train_dataloader, val_dataloader=val_dataloader, epochs=epochs)

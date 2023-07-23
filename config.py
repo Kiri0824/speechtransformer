@@ -7,9 +7,9 @@ seed=111
 # 遮盖次数
 num_mask=2
 # 频率维度遮盖最大比例
-freq_masking_max_percentage=0.15
+freq_masking_max_percentage=0.1
 # 时间维度遮盖最大比例
-time_masking_max_percentage=0.3
+time_masking_max_percentage=0.1
 # -------------------------------------------------
 
 # 预处理添加跳帧和堆叠(体现在图中见jupyter)
@@ -33,15 +33,17 @@ d_model=256
 d_input=320
 num_heads=4
 drop_prob=0.1
-# 句子最长50
+# 句子最长35
 max_sequence_length=50
 # feedforward神经网络的隐藏层维度
 ffn_hidden=1024
 num_layers=6
+en_num_layers=8
+ou_num_layers=4
 shuffle=True
 num_workers=0
-learning_rate=1e-4
-epochs=20
+learning_rate=1e-5
+epochs=5
 pin_memory=True
 shuffle=True
 num_workers=0
