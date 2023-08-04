@@ -57,7 +57,7 @@ def test_loop(model):
             print(trn_merge)
             print(i)
             print(loss)
-            with open('./wrong.txt', "a") as file:
+            with open('./wrongnew.txt', "a") as file:
                 file.write(str(i))
                 file.write('\n')
                 file.write("预测:") 

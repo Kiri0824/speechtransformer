@@ -144,7 +144,7 @@ class SpeechDataset(Dataset):
         # 标准化
         feature = (feature - feature.mean()) / feature.std()
         # 添加噪声
-        feature=spec_augment(feature)
+        #feature=spec_augment(feature)
         feature=build_LFR_features(feature)
         # feature = torch.from_numpy(feature)
         # feature = torch.unsqueeze(feature, 0)

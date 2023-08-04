@@ -14,8 +14,8 @@ time_masking_max_percentage=0.1
 
 # 预处理添加跳帧和堆叠(体现在图中见jupyter)
 LFR_stack=4
-LFR_skip=3
-d_feature=80
+LFR_skip=1
+d_feature=100
 # -------------------------------------------------
 
 # extract_feature
@@ -28,23 +28,23 @@ NEG_INF = -1e9
 
 # 训练参数
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-batch_size=30
+batch_size=6
 d_model=256
-d_input=320
-num_heads=4
+d_input=400
+num_heads=8
 drop_prob=0.1
 # 句子最长35
 max_sequence_length=50
 # feedforward神经网络的隐藏层维度
 ffn_hidden=1024
 num_layers=6
-en_num_layers=8
-ou_num_layers=4
+en_num_layers=6
+ou_num_layers=6
 shuffle=True
 num_workers=0
-learning_rate=1e-5
-epochs=5
-pin_memory=True
+learning_rate=1e-4
+epochs=20
+pin_memory=False
 shuffle=True
 num_workers=0
 START_TOKEN='<sos>'
