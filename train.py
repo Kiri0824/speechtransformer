@@ -1,4 +1,4 @@
-from Transformer import Transformer
+from SpeechTransformer import Transformer
 import torch.nn as nn
 import torch
 import pickle
