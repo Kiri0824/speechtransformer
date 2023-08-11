@@ -1,4 +1,4 @@
-from Transformer import Transformer
+from SpeechTransformer import Transformer
 import torch
 from config import pickle_file
 from config import device,d_model,d_input,ffn_hidden,d_feature

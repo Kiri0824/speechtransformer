@@ -1,9 +1,9 @@
-from SpeechTransformer import Transformer
+from conformer import Transformer
 import torch.nn as nn
 import torch
 import pickle
 from data_load import SpeechDataset,pad_collate
-from config import batch_size,pickle_file,START_TOKEN,END_TOKEN,PADDING_TOKEN,LFR_skip,LFR_stack,num_layers
+from config import batch_size,pickle_file,START_TOKEN,END_TOKEN,PADDING_TOKEN,LFR_skip,LFR_stack
 from config import device,learning_rate,d_model,d_input,ffn_hidden
 from config import num_heads,drop_prob,max_sequence_length
 from config import epochs,shuffle,num_workers,pin_memory,d_feature,en_num_layers,ou_num_layers
@@ -143,7 +143,7 @@ val_dataloader=DataLoader(val_dataset, batch_size=batch_size,collate_fn=pad_coll
 
 char_list=data['IVOCAB']
 number_list=data['VOCAB']
-transformer=Transformer(d_model,d_input,ffn_hidden,num_heads,drop_prob,num_layers,max_sequence_length,number_list,START_TOKEN=START_TOKEN,END_TOKEN=END_TOKEN,PADDING_TOKEN=PADDING_TOKEN).to(device)
+transformer=Transformer(d_model,d_input,ffn_hidden,num_heads,drop_prob,en_num_layers,ou_num_layers,max_sequence_length,number_list,START_TOKEN=START_TOKEN,END_TOKEN=END_TOKEN,PADDING_TOKEN=PADDING_TOKEN).to(device)
 loss_fn = nn.CrossEntropyLoss(ignore_index=number_list[PADDING_TOKEN],reduction='none')
 for params in transformer.parameters():
     if params.dim() > 1:

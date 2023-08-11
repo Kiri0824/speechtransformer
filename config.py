@@ -31,15 +31,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 batch_size=6
 d_model=256
 d_input=400
-num_heads=8
+num_heads=4
 drop_prob=0.1
 # 句子最长35
 max_sequence_length=50
 # feedforward神经网络的隐藏层维度
 ffn_hidden=1024
-num_layers=6
+# num_layers=6
 en_num_layers=6
-ou_num_layers=6
+ou_num_layers=1
 shuffle=True
 num_workers=0
 learning_rate=1e-4

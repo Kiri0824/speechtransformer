@@ -78,7 +78,7 @@ random.seed(seed)
 def spec_augment(spec: np.ndarray, num_mask=num_mask, 
                  freq_masking_max_percentage=freq_masking_max_percentage, time_masking_max_percentage=time_masking_max_percentage):
 
-    spec = spec.copy()
+    spec = spec.clone()
     for i in range(num_mask):
         all_frames_num, all_freqs_num = spec.shape
         freq_percentage = random.uniform(0.0, freq_masking_max_percentage)

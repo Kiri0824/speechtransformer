@@ -62,7 +62,7 @@ class PositionalEncoding(nn.Module):
         # PE的维度是max_sequence_length*d_model
         PE = torch.flatten(stacked, start_dim=1, end_dim=2).to(device)
         x = x + PE[:x.size(1), :]
-        return x
+        return x 
 class PositionwiseFeedForward(nn.Module):
 
     def __init__(self, d_model, hidden, drop_prob=0.1):
@@ -83,18 +83,18 @@ class EncoderLayer(nn.Module):
         super(EncoderLayer,self).__init__()
         self.attention=MultiHeadAttention(d_model=d_model,num_heads=num_heads)
         self.norm1=nn.LayerNorm(d_model)
-        self.droupout1=nn.Dropout(drop_prob)
+        self.dropout1=nn.Dropout(drop_prob)
         self.ffn=PositionwiseFeedForward(d_model=d_model,hidden=ffn_hidden,drop_prob=drop_prob)
         self.norm2=nn.LayerNorm(d_model)
-        self.droupout2=nn.Dropout(drop_prob)
+        self.dropout2=nn.Dropout(drop_prob)
     def forward(self,x):
         residual_x=x
         x=self.attention(x,mask=None)
-        x=self.droupout1(x)
+        x=self.dropout1(x)
         x=self.norm1(x+residual_x)
         residual_x=x
         x=self.ffn(x)
-        x=self.droupout2(x)
+        x=self.dropout2(x)
         x=self.norm2(x+residual_x)
         return x
 
