@@ -30,6 +30,7 @@ class FeedForward(nn.Module):
     def __init__(self,d_model,mult = 4,dropout = 0.1):
         super().__init__()
         self.net = nn.Sequential(
+            nn.LayerNorm(d_model),
             nn.Linear(d_model, d_model * mult),
             Swish(),
             nn.Dropout(dropout),
